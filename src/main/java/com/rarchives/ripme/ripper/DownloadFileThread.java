@@ -213,37 +213,24 @@ class DownloadFileThread implements Runnable {
                 }
                 // If we're resuming a download we append data to the existing file
                 OutputStream fos = null;
+                int maxLength = 155;
                 if (statusCode == 206) {
                     fos = new FileOutputStream(saveAs, true);
                 } else {
-                    try {
+                    if (saveAs.getName().length() > maxLength) {
+                        String[] saveAsSplit = saveAs.getName().split("\\.");
+                        // Get the file extension so when we shorten the file name we don't cut off the
+                        // file extension
+                        String fileExt = saveAsSplit[saveAsSplit.length - 1];
+                        logger.info(saveAs.getName().substring(0, maxLength - fileExt.length()) + fileExt);
+                        String filename = saveAs.getName().substring(0, maxLength - fileExt.length()) + "." + fileExt;
+                        // We can't just use the new file name as the saveAs because the file name
+                        // doesn't include the
+                        // users save path, so we get the user save path from the old saveAs
+                        saveAs = new File(saveAs.getParentFile().getAbsolutePath() + File.separator + filename);
                         fos = new FileOutputStream(saveAs);
-                    } catch (FileNotFoundException e) {
-                        // We do this because some filesystems have a max name length
-                        if (e.getMessage().contains("File name too long")) {
-                            logger.error("The filename " + saveAs.getName()
-                                    + " is to long to be saved on this file system.");
-                            logger.info("Shortening filename");
-                            String[] saveAsSplit = saveAs.getName().split("\\.");
-                            // Get the file extension so when we shorten the file name we don't cut off the
-                            // file extension
-                            String fileExt = saveAsSplit[saveAsSplit.length - 1];
-                            // The max limit for filenames on Linux with Ext3/4 is 255 bytes
-                            logger.info(saveAs.getName().substring(0, 254 - fileExt.length()) + fileExt);
-                            String filename = saveAs.getName().substring(0, 254 - fileExt.length()) + "." + fileExt;
-                            // We can't just use the new file name as the saveAs because the file name
-                            // doesn't include the
-                            // users save path, so we get the user save path from the old saveAs
-                            saveAs = new File(saveAs.getParentFile().getAbsolutePath() + File.separator + filename);
-                            fos = new FileOutputStream(saveAs);
-                        } else if (saveAs.getAbsolutePath().length() > 259 && Utils.isWindows()) {
-                            // This if is for when the file path has gone above 260 chars which windows does
-                            // not allow
-                            fos = Files.newOutputStream(
-                                    Utils.shortenSaveAsWindows(saveAs.getParentFile().getPath(), saveAs.getName()));
-                            assert fos != null: "After shortenSaveAsWindows: " + saveAs.getAbsolutePath();
-                        }
-                        assert fos != null: e.getStackTrace();
+                    } else {
+                        fos = new FileOutputStream(saveAs);
                     }
                 }
                 byte[] data = new byte[1024 * 256];
